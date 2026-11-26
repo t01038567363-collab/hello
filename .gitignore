@@ -1,0 +1,8 @@
+node_modules/
+.next/
+out/
+coverage/
+public/models/*.task
+/public/mediapipe/wasm/
+*.tsbuildinfo
+.env*.local
