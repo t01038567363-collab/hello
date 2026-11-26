@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { createRouteStrip, createWalkingRoute, sampleRoute } from "@/lib/walking-route";
 
 export type Theme = "retro" | "cherry" | "sea";
 
@@ -19,6 +20,7 @@ export default function Scene({ theme, walking, direction, friendVisible }: {
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const controls = useRef({ walking, direction, friendVisible });
+  const travel = useRef(0);
   const [error, setError] = useState(false);
 
   useEffect(() => {
@@ -49,26 +51,27 @@ export default function Scene({ theme, walking, direction, friendVisible }: {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
 
+    const route = createWalkingRoute();
+    const length = route.getLength();
     const road = new THREE.Mesh(
-      new THREE.PlaneGeometry(7.5, 160),
+      createRouteStrip(route, -3.75, 3.75),
       new THREE.MeshStandardMaterial({ color: palette.road, roughness: 0.5 }),
     );
-    road.rotation.x = -Math.PI / 2;
-    road.position.z = -70;
     scene.add(road);
-    const railGeometry = new THREE.BoxGeometry(0.13, 0.13, 160);
     const accent = new THREE.MeshBasicMaterial({ color: palette.accent });
-    for (const x of [-3.4, 3.4]) {
-      const rail = new THREE.Mesh(railGeometry, accent);
-      rail.position.set(x, 0.1, -70);
+    for (const offset of [-3.4, 3.4]) {
+      const rail = new THREE.Mesh(createRouteStrip(route, offset - 0.07, offset + 0.07, 0.02), accent);
       scene.add(rail);
     }
 
     const objects = new THREE.Group();
     scene.add(objects);
-    for (let i = 0; i < 24; i++) {
+    const objectCount = Math.ceil(length / 9);
+    for (let i = 0; i < objectCount; i++) {
       const group = new THREE.Group();
-      group.position.z = -i * 6.5;
+      const { position, tangent } = sampleRoute(route, (i / objectCount) * length);
+      group.position.copy(position);
+      group.rotation.y = Math.atan2(-tangent.x, -tangent.z);
       if (theme === "cherry") {
         const arch = new THREE.Mesh(new THREE.TorusGeometry(4.2, 0.15, 8, 28, Math.PI), accent);
         arch.position.y = 0.5;
@@ -92,9 +95,11 @@ export default function Scene({ theme, walking, direction, friendVisible }: {
     }
     const positions = new Float32Array(400 * 3);
     for (let i = 0; i < positions.length; i += 3) {
-      positions[i] = (Math.random() - 0.5) * 18;
+      const { position, right } = sampleRoute(route, Math.random() * length);
+      const offset = (Math.random() - 0.5) * 18;
+      positions[i] = position.x + right.x * offset;
       positions[i + 1] = Math.random() * 8 + 0.3;
-      positions[i + 2] = -Math.random() * 130 + 8;
+      positions[i + 2] = position.z + right.z * offset;
     }
     const particlesGeometry = new THREE.BufferGeometry();
     particlesGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -122,7 +127,6 @@ export default function Scene({ theme, walking, direction, friendVisible }: {
       arm.position.set(x * 2.2, 1.05, 0);
       friend.add(arm);
     }
-    friend.position.set(1.2, 0, -18);
     friend.visible = false;
     scene.add(friend);
 
@@ -139,31 +143,34 @@ export default function Scene({ theme, walking, direction, friendVisible }: {
     resize();
     let frame = 0;
     let previous = 0;
+    let lateral = 0;
+    let friendDistance = 18;
     const animate = (time: number) => {
       frame = requestAnimationFrame(animate);
       const delta = previous ? Math.min((time - previous) / 1000, 0.1) : 0;
       previous = time;
       const current = controls.current;
       if (current.walking) {
-        const movement = 2 * delta;
-        objects.children.forEach((item) => {
-          item.position.z += movement;
-          if (item.position.z > 8) item.position.z -= 24 * 6.5;
-        });
-        for (let i = 2; i < positions.length; i += 3) {
-          positions[i] += movement * 0.8;
-          if (positions[i] > 8) positions[i] = -120;
-        }
-        if (!current.friendVisible) {
-          friend.visible = false;
-          friend.position.z = -18;
-        } else {
-          friend.visible = true;
-          if (current.walking) friend.position.z = Math.min(0, friend.position.z + 8 * delta);
-        }
-        particlesGeometry.attributes.position.needsUpdate = true;
+        travel.current += 2 * delta;
+        if (current.friendVisible) friendDistance = Math.max(5, friendDistance - 8 * delta);
       }
-      camera.position.x += (current.direction * 1.1 - camera.position.x) * Math.min(delta * 4, 1);
+      lateral += (current.direction * 1.1 - lateral) * Math.min(delta * 4, 1);
+      const currentPoint = sampleRoute(route, travel.current);
+      const ahead = sampleRoute(route, travel.current + 7);
+      camera.position.copy(currentPoint.position).addScaledVector(currentPoint.right, lateral);
+      camera.position.y = 2.2;
+      const target = ahead.position.addScaledVector(ahead.right, lateral);
+      target.y = 1.7;
+      camera.lookAt(target);
+
+      friend.visible = current.friendVisible;
+      if (current.friendVisible) {
+        const friendPoint = sampleRoute(route, travel.current + friendDistance);
+        friend.position.copy(friendPoint.position).addScaledVector(friendPoint.right, 1.2);
+        friend.rotation.y = Math.atan2(friendPoint.tangent.x, friendPoint.tangent.z);
+      } else {
+        friendDistance = 18;
+      }
       renderer.render(scene, camera);
     };
     frame = requestAnimationFrame(animate);

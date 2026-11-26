@@ -148,6 +148,7 @@ export default function MediaArtPage() {
           </div>
         </header>
 
+        <div className="art-view-gap" aria-hidden="true" />
         <aside className="art-summary art-box">
           <h2>시연 기록</h2>
           <p>가상 이동 {Math.floor(distance)} m</p>
