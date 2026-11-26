@@ -453,6 +453,9 @@ export default function Home() {
             <button type="button" className="button button-primary button-wide" onClick={() => setScreen("ready")}>
               이 장소에서 시작하기 <span aria-hidden="true">→</span>
             </button>
+            <p className="privacy-caption">
+              <a href="/media-art">3D 미디어아트 산책 체험하기 →</a>
+            </p>
           </section>
         )}
 
