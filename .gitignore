@@ -5,3 +5,4 @@ coverage/
 public/models/*.task
 /public/mediapipe/wasm/
 *.tsbuildinfo
+.env*.local

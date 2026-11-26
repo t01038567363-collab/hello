@@ -20,6 +20,7 @@ import {
   type Session,
 } from "@/lib/session";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { StreetView } from "./street-view";
 
 type Place = {
   id: string;
@@ -27,6 +28,8 @@ type Place = {
   region: string;
   description: string;
   theme: "harbor" | "river";
+  location: { lat: number; lng: number };
+  heading: number;
 };
 
 const PLACES: Place[] = [
@@ -36,6 +39,8 @@ const PLACES: Place[] = [
     region: "경남 사천",
     description: "바닷바람과 항구 풍경을 떠올리는 산책길",
     theme: "harbor",
+    location: { lat: 34.9235, lng: 128.0695 },
+    heading: 90,
   },
   {
     id: "jinju-river",
@@ -43,6 +48,8 @@ const PLACES: Place[] = [
     region: "경남 진주",
     description: "남강을 따라 천천히 걷는 산책길",
     theme: "river",
+    location: { lat: 35.1916, lng: 128.0788 },
+    heading: 90,
   },
 ];
 
@@ -185,6 +192,7 @@ export default function Home() {
   const [cameraError, setCameraError] = useState("");
   const [sample, setSample] = useState<PoseSample | null>(null);
   const [now, setNow] = useState(0);
+  const [streetViewVisible, setStreetViewVisible] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -315,6 +323,7 @@ export default function Home() {
       return;
     }
     sessionRef.current = started;
+    setStreetViewVisible(false);
     setSession(started);
     setNow(performance.now());
     setScreen("walking");
@@ -322,6 +331,7 @@ export default function Home() {
 
   const startDemoSession = () => {
     stopCamera();
+    setStreetViewVisible(false);
     const started = startSession(
       createSession(selectedPlace.id, "demo"),
       { centerX: 0.5, width: 0.3 },
@@ -408,7 +418,7 @@ export default function Home() {
             <p className="eyebrow">천천히, 편안하게</p>
             <h1>오늘은 어디를<br />함께 걸어볼까요?</h1>
             <p className="lead">
-              익숙한 경남의 풍경을 고르고, 화면의 움직임 미션을 가볍게 경험해 보세요.
+              경남의 장소를 고르고, 화면의 움직임 미션을 가볍게 경험해 보세요.
             </p>
             <div className="place-grid" role="group" aria-label="산책 장소 선택">
               {PLACES.map((place) => (
@@ -438,7 +448,7 @@ export default function Home() {
             </div>
             <div className="info-note">
               <span className="info-icon" aria-hidden="true">i</span>
-              <p>이번 시연은 미리 준비된 경남 장소로 진행합니다. 원하는 국내외 여행지와 추억 장소는 향후 확장 목표입니다.</p>
+              <p>이번 시연은 경남 장소로 진행합니다. 설정된 경우 Google 거리 사진을 사용하며, 사용할 수 없으면 일러스트로 보여드립니다. 국내외 여행지와 추억 장소는 향후 확장 목표입니다.</p>
             </div>
             <button type="button" className="button button-primary button-wide" onClick={() => setScreen("ready")}>
               이 장소에서 시작하기 <span aria-hidden="true">→</span>
@@ -499,6 +509,7 @@ export default function Home() {
               </button>
             </div>
             <p className="privacy-caption">대체 시연은 개발용 입력이며 웹캠 인식 성능을 보여주지 않습니다.</p>
+            <p className="privacy-caption">거리 사진 사용 시 Google에 장소와 접속 정보가 전달될 수 있습니다. 웹캠 영상은 이 기기에서 처리합니다.</p>
           </section>
         )}
 
@@ -557,11 +568,17 @@ export default function Home() {
             <div className="walk-card">
               <div className="scene-wrap">
                 <PlaceScene theme={selectedPlace.theme} label={selectedPlace.name} />
-                <div className="scene-shade" />
-                <div className="scene-caption">
+                <StreetView
+                  location={selectedPlace.location}
+                  heading={selectedPlace.heading}
+                  successes={summary?.successCount ?? 0}
+                  onVisibleChange={setStreetViewVisible}
+                />
+                {!streetViewVisible && <div className="scene-shade" />}
+                {!streetViewVisible && <div className="scene-caption">
                   <span className="live-pill"><span /> 산책 중</span>
                   <span>{selectedPlace.region}</span>
-                </div>
+                </div>}
                 {currentMission.status === "active" && (
                   <div className={`target-card target-${currentMission.direction}`}>
                     <span className="target-arrow" aria-hidden="true">
