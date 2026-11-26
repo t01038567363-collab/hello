@@ -7,11 +7,10 @@ import { createParkScenery } from "./park-scenery";
 
 export type Theme = "park" | "retro" | "cherry" | "sea";
 
-const colors = {
-  park: { background: 0x9dcdec, road: 0xd8d1b8, accent: 0xbeb9a3, particles: 0xffffff },
-  retro: { background: 0x160d18, road: 0x241e26, accent: 0xf59e0b, particles: 0xffb703 },
-  cherry: { background: 0x190b18, road: 0x2b1929, accent: 0xf472b6, particles: 0xfbcfe8 },
-  sea: { background: 0x051324, road: 0x0a2540, accent: 0x38bdf8, particles: 0x7dd3fc },
+const photos = {
+  retro: "/media-art/retro.png",
+  cherry: "/media-art/cherry.png",
+  sea: "/media-art/sea.png",
 };
 
 export default function Scene({ theme, walking, direction, friendVisible }: {
@@ -24,6 +23,7 @@ export default function Scene({ theme, walking, direction, friendVisible }: {
   const controls = useRef({ walking, direction, friendVisible });
   const travel = useRef(0);
   const [error, setError] = useState(false);
+  const [failedPhoto, setFailedPhoto] = useState<Theme | null>(null);
 
   useEffect(() => {
     controls.current = { walking, direction, friendVisible };
@@ -34,83 +34,46 @@ export default function Scene({ theme, walking, direction, friendVisible }: {
     if (!container) return;
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "low-power" });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: theme !== "park", powerPreference: "low-power" });
     } catch {
       setError(true);
       return;
     }
     setError(false);
-    const palette = colors[theme];
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(palette.background);
-    scene.fog = new THREE.FogExp2(palette.background, theme === "park" ? 0.009 : 0.023);
+    if (theme === "park") {
+      scene.background = new THREE.Color(0x9dcdec);
+      scene.fog = new THREE.FogExp2(0x9dcdec, 0.009);
+    }
     const camera = new THREE.PerspectiveCamera(65, 1, 0.1, 200);
     camera.position.set(0, 2.2, 5);
+    scene.add(camera);
     scene.add(new THREE.AmbientLight(0xffffff, 1.2));
     const light = new THREE.DirectionalLight(0xffeedd, 1.5);
     light.position.set(5, 15, 10);
     scene.add(light);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    if (theme === "park") {
+      renderer.domElement.setAttribute("role", "img");
+      renderer.domElement.setAttribute("aria-label", "가상의 공원 산책 풍경");
+    } else {
+      renderer.domElement.setAttribute("aria-hidden", "true");
+    }
     container.appendChild(renderer.domElement);
 
     const route = createWalkingRoute();
-    const length = route.getLength();
-    if (theme === "park") scene.add(createParkScenery(route));
-    const road = new THREE.Mesh(
-      createRouteStrip(route, -3.75, 3.75),
-      new THREE.MeshStandardMaterial({ color: palette.road, roughness: 0.5 }),
-    );
-    scene.add(road);
-    const accent = new THREE.MeshBasicMaterial({ color: palette.accent });
-    for (const offset of [-3.4, 3.4]) {
-      const rail = new THREE.Mesh(createRouteStrip(route, offset - 0.07, offset + 0.07, 0.02), accent);
-      scene.add(rail);
-    }
-
-    const objects = new THREE.Group();
-    scene.add(objects);
-    const objectCount = theme === "park" ? 0 : Math.ceil(length / 9);
-    for (let i = 0; i < objectCount; i++) {
-      const group = new THREE.Group();
-      const { position, tangent } = sampleRoute(route, (i / objectCount) * length);
-      group.position.copy(position);
-      group.rotation.y = Math.atan2(-tangent.x, -tangent.z);
-      if (theme === "cherry") {
-        const arch = new THREE.Mesh(new THREE.TorusGeometry(4.2, 0.15, 8, 28, Math.PI), accent);
-        arch.position.y = 0.5;
-        group.add(arch);
-      } else {
-        const geometry = theme === "retro"
-          ? new THREE.BoxGeometry(0.23, 5, 0.23)
-          : new THREE.CylinderGeometry(0.2, 0.3, 5, 12);
-        for (const x of [-3.8, 3.8]) {
-          const pillar = new THREE.Mesh(geometry, accent);
-          pillar.position.set(x, 2.5, 0);
-          group.add(pillar);
-        }
-        if (theme === "retro") {
-          const sign = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.7, 0.25), accent);
-          sign.position.set(i % 2 ? 3.1 : -3.1, 3.2, 0);
-          group.add(sign);
-        }
+    if (theme === "park") {
+      scene.add(createParkScenery(route));
+      scene.add(new THREE.Mesh(
+        createRouteStrip(route, -3.75, 3.75),
+        new THREE.MeshStandardMaterial({ color: 0xd8d1b8, roughness: 0.5 }),
+      ));
+      const accent = new THREE.MeshBasicMaterial({ color: 0xbeb9a3 });
+      for (const offset of [-3.4, 3.4]) {
+        const rail = new THREE.Mesh(createRouteStrip(route, offset - 0.07, offset + 0.07, 0.02), accent);
+        scene.add(rail);
       }
-      objects.add(group);
     }
-    const positions = new Float32Array((theme === "park" ? 0 : 400) * 3);
-    for (let i = 0; i < positions.length; i += 3) {
-      const { position, right } = sampleRoute(route, Math.random() * length);
-      const offset = (Math.random() - 0.5) * 18;
-      positions[i] = position.x + right.x * offset;
-      positions[i + 1] = Math.random() * 8 + 0.3;
-      positions[i + 2] = position.z + right.z * offset;
-    }
-    const particlesGeometry = new THREE.BufferGeometry();
-    particlesGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    const particles = new THREE.Points(
-      particlesGeometry,
-      new THREE.PointsMaterial({ color: palette.particles, size: 0.2, transparent: true, opacity: 0.8 }),
-    );
-    scene.add(particles);
 
     const friend = new THREE.Group();
     const skin = new THREE.MeshStandardMaterial({ color: 0xf3c8a9 });
@@ -131,7 +94,8 @@ export default function Scene({ theme, walking, direction, friendVisible }: {
       friend.add(arm);
     }
     friend.visible = false;
-    scene.add(friend);
+    if (theme === "park") scene.add(friend);
+    else camera.add(friend);
 
     const resize = () => {
       const width = container.clientWidth;
@@ -157,20 +121,24 @@ export default function Scene({ theme, walking, direction, friendVisible }: {
         travel.current += 2 * delta;
         if (current.friendVisible) friendDistance = Math.max(5, friendDistance - 8 * delta);
       }
-      lateral += (current.direction * 1.1 - lateral) * Math.min(delta * 4, 1);
-      const currentPoint = sampleRoute(route, travel.current);
-      const ahead = sampleRoute(route, travel.current + 7);
-      camera.position.copy(currentPoint.position).addScaledVector(currentPoint.right, lateral);
-      camera.position.y = 2.2;
-      const target = ahead.position.addScaledVector(ahead.right, lateral);
-      target.y = 1.7;
-      camera.lookAt(target);
+      if (theme === "park") {
+        lateral += (current.direction * 1.1 - lateral) * Math.min(delta * 4, 1);
+        const currentPoint = sampleRoute(route, travel.current);
+        const ahead = sampleRoute(route, travel.current + 7);
+        camera.position.copy(currentPoint.position).addScaledVector(currentPoint.right, lateral);
+        camera.position.y = 2.2;
+        const target = ahead.position.addScaledVector(ahead.right, lateral);
+        target.y = 1.7;
+        camera.lookAt(target);
+      }
 
       friend.visible = current.friendVisible;
-      if (current.friendVisible) {
+      if (current.friendVisible && theme === "park") {
         const friendPoint = sampleRoute(route, travel.current + friendDistance);
         friend.position.copy(friendPoint.position).addScaledVector(friendPoint.right, 1.2);
         friend.rotation.y = Math.atan2(friendPoint.tangent.x, friendPoint.tangent.z);
+      } else if (current.friendVisible) {
+        friend.position.set(1.2, -2.2, -friendDistance);
       } else {
         friendDistance = 18;
       }
@@ -194,7 +162,9 @@ export default function Scene({ theme, walking, direction, friendVisible }: {
   }, [theme]);
 
   return (
-    <div ref={containerRef} className="art-scene" role="img" aria-label="가상 미디어아트 산책 풍경">
+    <div ref={containerRef} className="art-scene">
+      {theme !== "park" && <img key={theme} className="art-photo" src={photos[theme]} alt={{ retro: "8090 추억길 사진", cherry: "진해 벚꽃길 사진", sea: "통영 바다길 사진" }[theme]} onLoad={() => setFailedPhoto(null)} onError={() => setFailedPhoto(theme)} />}
+      {theme !== "park" && failedPhoto === theme && <p className="art-scene-error" role="alert">배경 사진을 불러올 수 없습니다. 페이지를 다시 열어 주세요.</p>}
       {error && <p className="art-scene-error" role="alert">3D 화면을 표시할 수 없습니다. 다른 브라우저나 기기에서 다시 시도해 주세요.</p>}
     </div>
   );
