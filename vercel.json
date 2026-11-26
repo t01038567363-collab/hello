@@ -1,0 +1,3 @@
+{
+  "buildCommand": "npm run setup:model && npm run build"
+}

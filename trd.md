@@ -42,6 +42,7 @@
 - **실행 명령:** Node.js 22와 npm이 설치된 프로젝트에서 `npm ci` → `npm run setup:model` → `npm run dev`를 실행하고 Chrome에서 `http://localhost:3000`을 연다. `npm ci`의 `postinstall`은 설치된 MediaPipe WASM 파일을 `public/mediapipe/wasm`으로 복사한다. 지원 브라우저는 현재 웹캠이 있는 데스크톱 Chrome을 목표로 하며, 정확한 OS·브라우저 버전은 시험 전 확정한다.
 - **Pose 모델:** `npm run setup:model`은 공식 Pose Landmarker Lite 모델을 `public/models/pose_landmarker_lite.task`로 내려받는다. 모델은 `.gitignore` 처리되어 저장소에 커밋되지 않는다. 다운로드가 막히면 공식 배포처에서 같은 경로로 직접 넣어야 웹캠 모드를 사용할 수 있다. 개발 컨테이너에서는 모델 다운로드가 HTTP 403으로 차단되어 실제 Pose 추론을 시험하지 못했다.
 - **시연 배포:** 시연 노트북에서 Next.js 개발 서버를 실행하고 같은 기기의 Chrome으로 접속한다. HTTPS로 다른 기기에서 접속하는 배포 방식은 MVP 필수가 아니다.
+- **Vercel 배포:** `vercel.json`의 빌드 명령은 공식 Pose 모델을 로컬 자산 경로에 내려받은 후 앱을 빌드한다. 다운로드가 실패하면 모델이 빠진 웹캠 모드를 배포하지 않도록 빌드를 중단한다. 배포 환경의 모델 다운로드 및 실제 기기 인식 여부는 별도 확인이 필요하다.
 - **연결 제한:** Next.js 응답에 CSP를 적용해 앱 출처 외 `connect-src` 연결을 차단하고 카메라는 같은 출처로만 허용한다. 앱 코드에는 서버 API, 계정, DB, 이미지·영상 전송이나 외부 생성형 AI 호출을 두지 않는다. 실제 브라우저의 전체 네트워크 요청과 오프라인 동작은 모델을 설치한 시연 기기에서 추가 확인한다.
 
 ### 구성 요소 인터페이스
