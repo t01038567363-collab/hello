@@ -19,39 +19,16 @@ import {
   type PoseSample,
   type Session,
 } from "@/lib/session";
+import { cameraErrorMessage, type CameraStage } from "@/lib/camera-errors";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { StreetView } from "./street-view";
-
-type Place = {
-  id: string;
-  name: string;
-  region: string;
-  description: string;
-  theme: "harbor" | "river";
-  location: { lat: number; lng: number };
-  heading: number;
-};
-
-const PLACES: Place[] = [
-  {
-    id: "sacheon-harbor",
-    name: "삼천포 항구",
-    region: "경남 사천",
-    description: "바닷바람과 항구 풍경을 떠올리는 산책길",
-    theme: "harbor",
-    location: { lat: 34.9235, lng: 128.0695 },
-    heading: 90,
-  },
-  {
-    id: "jinju-river",
-    name: "진주 남강",
-    region: "경남 진주",
-    description: "남강을 따라 천천히 걷는 산책길",
-    theme: "river",
-    location: { lat: 35.1916, lng: 128.0788 },
-    heading: 90,
-  },
-];
+import { PLACES, type Place } from "./places";
+import {
+  CalibratingScreen,
+  PlacesScreen,
+  ReadyScreen,
+  ResultScreen,
+  WalkingScreen,
+} from "./walk-screens";
 
 type Screen = "places" | "ready" | "calibrating" | "walking" | "result";
 
@@ -72,116 +49,6 @@ function getShoulderSample(
   return { centerX: (leftX + rightX) / 2, width };
 }
 
-function formatDuration(milliseconds: number) {
-  const seconds = Math.floor(milliseconds / 1000);
-  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(
-    seconds % 60,
-  ).padStart(2, "0")}`;
-}
-
-function PlaceScene({
-  theme,
-  label,
-}: {
-  theme: Place["theme"];
-  label: string;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const context = canvas?.getContext("2d");
-    if (!canvas || !context) return;
-
-    const width = canvas.clientWidth * window.devicePixelRatio;
-    const height = canvas.clientHeight * window.devicePixelRatio;
-    canvas.width = width;
-    canvas.height = height;
-    context.scale(window.devicePixelRatio, window.devicePixelRatio);
-
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    const sky = context.createLinearGradient(0, 0, 0, h);
-    sky.addColorStop(0, theme === "harbor" ? "#9cc9d0" : "#b5d8d1");
-    sky.addColorStop(1, theme === "harbor" ? "#e8d5b1" : "#e7dfbd");
-    context.fillStyle = sky;
-    context.fillRect(0, 0, w, h);
-
-    context.fillStyle = "#f3d795";
-    context.beginPath();
-    context.arc(w * 0.78, h * 0.2, Math.min(w, h) * 0.075, 0, Math.PI * 2);
-    context.fill();
-
-    if (theme === "harbor") {
-      context.fillStyle = "#668d84";
-      context.beginPath();
-      context.moveTo(0, h * 0.53);
-      context.lineTo(w * 0.16, h * 0.34);
-      context.lineTo(w * 0.34, h * 0.51);
-      context.lineTo(w * 0.52, h * 0.32);
-      context.lineTo(w * 0.7, h * 0.52);
-      context.lineTo(w, h * 0.39);
-      context.lineTo(w, h * 0.72);
-      context.lineTo(0, h * 0.72);
-      context.closePath();
-      context.fill();
-      context.fillStyle = "#6ba7aa";
-      context.fillRect(0, h * 0.57, w, h * 0.28);
-      context.fillStyle = "#d8c29a";
-      context.fillRect(0, h * 0.83, w, h * 0.17);
-      context.fillStyle = "#f1e4c6";
-      context.fillRect(w * 0.12, h * 0.42, w * 0.12, h * 0.14);
-      context.fillRect(w * 0.28, h * 0.46, w * 0.1, h * 0.1);
-      context.fillStyle = "#58736d";
-      context.fillRect(w * 0.1, h * 0.39, w * 0.16, h * 0.035);
-      context.fillRect(w * 0.27, h * 0.43, w * 0.12, h * 0.03);
-      context.fillStyle = "#735846";
-      context.fillRect(w * 0.53, h * 0.48, w * 0.035, h * 0.18);
-      context.fillRect(w * 0.6, h * 0.45, w * 0.035, h * 0.21);
-    } else {
-      context.fillStyle = "#6b9480";
-      context.beginPath();
-      context.moveTo(0, h * 0.55);
-      context.lineTo(w * 0.18, h * 0.31);
-      context.lineTo(w * 0.37, h * 0.55);
-      context.lineTo(w * 0.58, h * 0.36);
-      context.lineTo(w * 0.78, h * 0.55);
-      context.lineTo(w, h * 0.39);
-      context.lineTo(w, h * 0.75);
-      context.lineTo(0, h * 0.75);
-      context.closePath();
-      context.fill();
-      context.fillStyle = "#74aaa5";
-      context.beginPath();
-      context.moveTo(0, h * 0.66);
-      context.quadraticCurveTo(w * 0.32, h * 0.57, w * 0.55, h * 0.68);
-      context.quadraticCurveTo(w * 0.8, h * 0.8, w, h * 0.63);
-      context.lineTo(w, h);
-      context.lineTo(0, h);
-      context.closePath();
-      context.fill();
-      context.fillStyle = "#d9c99d";
-      context.beginPath();
-      context.moveTo(0, h * 0.82);
-      context.quadraticCurveTo(w * 0.37, h * 0.73, w * 0.61, h * 0.84);
-      context.lineTo(w, h * 0.78);
-      context.lineTo(w, h);
-      context.lineTo(0, h);
-      context.closePath();
-      context.fill();
-    }
-  }, [theme]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="scene-canvas"
-      role="img"
-      aria-label={`${label} 풍경을 그린 사전 제작 일러스트`}
-    />
-  );
-}
-
 export default function Home() {
   const [screen, setScreen] = useState<Screen>("places");
   const [selectedPlace, setSelectedPlace] = useState<Place>(PLACES[0]);
@@ -200,6 +67,7 @@ export default function Home() {
   const animationRef = useRef<number | null>(null);
   const calibrationSamplesRef = useRef<PoseSample[]>([]);
   const sessionRef = useRef<Session | null>(null);
+  const cameraRequestRef = useRef(0);
 
   const updateSession = useCallback((update: (current: Session) => Session) => {
     const current = sessionRef.current;
@@ -210,6 +78,7 @@ export default function Home() {
   }, []);
 
   const stopCamera = useCallback(() => {
+    cameraRequestRef.current++;
     if (animationRef.current !== null) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
@@ -246,11 +115,29 @@ export default function Home() {
   );
 
   const connectCamera = async () => {
+    stopCamera();
+    const request = cameraRequestRef.current;
+    const isCurrent = () => cameraRequestRef.current === request;
+    let stage: CameraStage = "camera";
     setCameraError("");
     setSample(null);
     calibrationSamplesRef.current = [];
     setCameraStatus("카메라와 자세 인식 모델을 준비하고 있어요.");
     setScreen("calibrating");
+
+    const trackingFailed = (error: unknown) => {
+      if (!isCurrent()) return;
+      console.error("카메라 추적이 중단되었습니다.", error);
+      stopCamera();
+      handlePose(null, performance.now());
+      if (sessionRef.current) {
+        setCameraError(cameraErrorMessage(error, "tracking"));
+      } else {
+        setCameraError(cameraErrorMessage(error, "video"));
+        setCameraStatus("웹캠 모드를 시작하지 못했습니다.");
+        setScreen("ready");
+      }
+    };
 
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -261,12 +148,23 @@ export default function Home() {
         audio: false,
         video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
       });
+      if (!isCurrent()) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
+      stream.getVideoTracks().forEach((track) => {
+        track.addEventListener("ended", () => trackingFailed(new Error("Camera track ended")), { once: true });
+      });
+      stage = "video";
       if (!videoRef.current) throw new Error("카메라 화면을 준비하지 못했습니다.");
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
+      if (!isCurrent()) return;
 
+      stage = "model";
       const vision = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
+      if (!isCurrent()) return;
       const landmarker = await PoseLandmarker.createFromOptions(vision, {
         baseOptions: {
           modelAssetPath: "/models/pose_landmarker_lite.task",
@@ -278,11 +176,16 @@ export default function Home() {
         minPosePresenceConfidence: 0.55,
         minTrackingConfidence: 0.55,
       });
+      if (!isCurrent()) {
+        landmarker.close();
+        return;
+      }
       landmarkerRef.current = landmarker;
       setCameraStatus("양쪽 어깨가 화면에 보이도록 편안하게 서거나 앉아 주세요.");
 
       let lastDetectionAt = 0;
       const detect = (frameTime: number) => {
+        if (!isCurrent()) return;
         const video = videoRef.current;
         if (
           video &&
@@ -291,21 +194,22 @@ export default function Home() {
         ) {
           lastDetectionAt = frameTime;
           const timestamp = performance.now();
-          const result = landmarker.detectForVideo(video, timestamp);
-          handlePose(getShoulderSample(result.landmarks?.[0]), timestamp);
+          try {
+            const result = landmarker.detectForVideo(video, timestamp);
+            handlePose(getShoulderSample(result.landmarks?.[0]), timestamp);
+          } catch (error) {
+            trackingFailed(error);
+            return;
+          }
         }
         animationRef.current = requestAnimationFrame(detect);
       };
       animationRef.current = requestAnimationFrame(detect);
     } catch (error) {
+      if (!isCurrent()) return;
+      console.error("카메라를 시작하지 못했습니다.", error);
       stopCamera();
-      const message =
-        error instanceof Error ? error.message : "카메라를 시작하지 못했습니다.";
-      setCameraError(
-        message.includes("pose_landmarker_lite.task")
-          ? "자세 인식 모델 파일을 찾지 못했어요. 터미널에서 npm run setup:model을 실행한 뒤 다시 시작하거나 대체 시연을 선택해 주세요."
-          : message,
-      );
+      setCameraError(cameraErrorMessage(error, stage));
       setCameraStatus("웹캠 모드를 시작하지 못했습니다.");
       setScreen("ready");
     }
@@ -395,12 +299,10 @@ export default function Home() {
   };
 
   const summary = session ? getSessionSummary(session, now) : null;
-  const currentMission =
-    session && session.currentIndex !== null
-      ? session.missions[session.currentIndex]
-      : null;
+  const currentMission = session?.currentIndex === null || session?.currentIndex === undefined
+    ? null
+    : session.missions[session.currentIndex] ?? null;
   const centered = session?.mode === "demo" || isCentered(session?.baseline ?? null, sample);
-  const isWalking = screen === "walking";
 
   return (
     <main className="app-shell">
@@ -414,289 +316,57 @@ export default function Home() {
 
       <section className="app-content" aria-live="polite">
         {screen === "places" && (
-          <section className="panel intro-panel">
-            <p className="eyebrow">천천히, 편안하게</p>
-            <h1>오늘은 어디를<br />함께 걸어볼까요?</h1>
-            <p className="lead">
-              경남의 장소를 고르고, 화면의 움직임 미션을 가볍게 경험해 보세요.
-            </p>
-            <div className="place-grid" role="group" aria-label="산책 장소 선택">
-              {PLACES.map((place) => (
-                <button
-                  type="button"
-                  className={`place-card ${selectedPlace.id === place.id ? "is-selected" : ""}`}
-                  key={place.id}
-                  aria-pressed={selectedPlace.id === place.id}
-                  onClick={() => setSelectedPlace(place)}
-                >
-                  <span className={`place-art ${place.theme}`}>
-                    <span className="art-sun" />
-                    <span className="art-hill art-hill-one" />
-                    <span className="art-hill art-hill-two" />
-                    <span className="art-water" />
-                  </span>
-                  <span className="place-copy">
-                    <span className="place-region">{place.region}</span>
-                    <span className="place-name">{place.name}</span>
-                    <span className="place-description">{place.description}</span>
-                  </span>
-                  <span className="radio-indicator" aria-hidden="true">
-                    {selectedPlace.id === place.id ? "✓" : ""}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <div className="info-note">
-              <span className="info-icon" aria-hidden="true">i</span>
-              <p>이번 시연은 경남 장소로 진행합니다. 설정된 경우 Google 거리 사진을 사용하며, 사용할 수 없으면 일러스트로 보여드립니다. 국내외 여행지와 추억 장소는 향후 확장 목표입니다.</p>
-            </div>
-            <button type="button" className="button button-primary button-wide" onClick={() => setScreen("ready")}>
-              이 장소에서 시작하기 <span aria-hidden="true">→</span>
-            </button>
-            <p className="privacy-caption">
-              <a href="/media-art">3D 미디어아트 산책 체험하기 →</a>
-            </p>
-          </section>
+          <PlacesScreen
+            selectedPlace={selectedPlace}
+            onSelectPlace={setSelectedPlace}
+            onContinue={() => setScreen("ready")}
+          />
         )}
 
         {screen === "ready" && (
-          <section className="panel ready-panel">
-            <button type="button" className="back-button" onClick={() => setScreen("places")}>
-              <span aria-hidden="true">←</span> 장소 선택으로
-            </button>
-            <div className="ready-heading">
-              <p className="eyebrow">시작 전 안내</p>
-              <h1>편안하고 안전하게<br />준비해 주세요</h1>
-              <p className="lead">선택한 장소: <strong>{selectedPlace.name}</strong></p>
-            </div>
-            <div className="safety-card">
-              <span className="safety-icon" aria-hidden="true">!</span>
-              <div>
-                <h2>안전을 먼저 확인해요</h2>
-                <p>편안한 자세로 참여하고, 불편하거나 어지러우면 바로 멈추세요. 진행자와 안전한 공간에서 시연해 주세요.</p>
-              </div>
-            </div>
-            <label className="check-row">
-              <input
-                type="checkbox"
-                checked={safetyConfirmed}
-                onChange={(event) => setSafetyConfirmed(event.target.checked)}
-              />
-              <span>안내를 확인했고, 불편하면 언제든 중단하겠습니다.</span>
-            </label>
-            <label className="check-row camera-consent">
-              <input
-                type="checkbox"
-                checked={cameraConsent}
-                onChange={(event) => setCameraConsent(event.target.checked)}
-              />
-              <span>웹캠 사용에 동의합니다. 영상과 어깨 좌표는 이 기기에서만 처리하며 저장하거나 전송하지 않습니다.</span>
-            </label>
-            {cameraError && <p className="error-message" role="alert">{cameraError}</p>}
-            <div className="button-stack">
-              <button
-                type="button"
-                className="button button-primary button-wide"
-                disabled={!safetyConfirmed || !cameraConsent}
-                onClick={connectCamera}
-              >
-                웹캠으로 시작하기
-              </button>
-              <button
-                type="button"
-                className="button button-secondary button-wide"
-                disabled={!safetyConfirmed}
-                onClick={startDemoSession}
-              >
-                웹캠 없이 대체 시연하기
-              </button>
-            </div>
-            <p className="privacy-caption">대체 시연은 개발용 입력이며 웹캠 인식 성능을 보여주지 않습니다.</p>
-            <p className="privacy-caption">거리 사진 사용 시 Google에 장소와 접속 정보가 전달될 수 있습니다. 웹캠 영상은 이 기기에서 처리합니다.</p>
-          </section>
+          <ReadyScreen
+            place={selectedPlace}
+            safetyConfirmed={safetyConfirmed}
+            cameraConsent={cameraConsent}
+            error={cameraError}
+            onSafetyChange={setSafetyConfirmed}
+            onCameraConsentChange={setCameraConsent}
+            onConnectCamera={connectCamera}
+            onStartDemo={startDemoSession}
+            onBack={() => setScreen("places")}
+          />
         )}
 
         {screen === "calibrating" && (
-          <section className="panel calibrate-panel">
-            <p className="eyebrow">카메라 준비</p>
-            <h1>양쪽 어깨가<br />화면에 보이도록 해주세요</h1>
-            <p className="lead">{cameraStatus}</p>
-            <div className="camera-frame">
-              <div className="camera-guide" aria-hidden="true">
-                <span className="guide-dot" />
-                <span className="guide-line" />
-                <span className="guide-label">어깨를 화면 가운데에 맞춰 주세요</span>
-              </div>
-              <span className={`camera-state ${sample ? "camera-state-ready" : ""}`}>
-                <span className="status-dot" />
-                {sample ? "양쪽 어깨 인식 중" : "어깨를 찾고 있어요"}
-              </span>
-            </div>
-            <div className="notice-card">
-              <strong>몸을 무리해서 움직이지 마세요.</strong>
-              <span>
-                {getStableBaseline(calibrationSamplesRef.current)
-                  ? "어깨가 안정적으로 보여요. 편안한 자세에서 기준을 잡을 수 있습니다."
-                  : "중앙에서 편안한 자세를 유지해 주세요. 상체 움직임만 인식하며 체중 이동이나 균형을 측정하지 않습니다."}
-              </span>
-            </div>
-            <div className="button-stack">
-              <button
-                type="button"
-                className="button button-primary button-wide"
-                disabled={!getStableBaseline(calibrationSamplesRef.current)}
-                onClick={startWebcamSession}
-              >
-                편안한 자세로 기준 잡기
-              </button>
-              {cameraError && <p className="error-message" role="alert">{cameraError}</p>}
-              <button type="button" className="button button-secondary button-wide" onClick={cancelCameraSetup}>
-                중단하기
-              </button>
-            </div>
-          </section>
+          <CalibratingScreen
+            status={cameraStatus}
+            sample={sample}
+            hasStableBaseline={Boolean(getStableBaseline(calibrationSamplesRef.current))}
+            error={cameraError}
+            onStart={startWebcamSession}
+            onCancel={cancelCameraSetup}
+          />
         )}
 
-        {isWalking && session && session.currentIndex !== null && currentMission && (
-          <section className="walk-layout">
-            <div className="walk-header">
-              <div>
-                <p className="eyebrow">{session.mode === "demo" ? "대체 시연 모드" : "화면 움직임 미션"}</p>
-                <h1>{selectedPlace.name}</h1>
-              </div>
-              <button type="button" className="button button-stop" onClick={stopActivity}>
-                <span aria-hidden="true">■</span> 중단하기
-              </button>
-            </div>
-            <div className="walk-card">
-              <div className="scene-wrap">
-                <PlaceScene theme={selectedPlace.theme} label={selectedPlace.name} />
-                <StreetView
-                  location={selectedPlace.location}
-                  heading={selectedPlace.heading}
-                  successes={summary?.successCount ?? 0}
-                  onVisibleChange={setStreetViewVisible}
-                />
-                {!streetViewVisible && <div className="scene-shade" />}
-                {!streetViewVisible && <div className="scene-caption">
-                  <span className="live-pill"><span /> 산책 중</span>
-                  <span>{selectedPlace.region}</span>
-                </div>}
-                {currentMission.status === "active" && (
-                  <div className={`target-card target-${currentMission.direction}`}>
-                    <span className="target-arrow" aria-hidden="true">
-                      {currentMission.direction === "right" ? "→" : "←"}
-                    </span>
-                    <span>{currentMission.direction === "right" ? "오른쪽" : "왼쪽"}으로 천천히</span>
-                  </div>
-                )}
-                {currentMission.status === "success" && (
-                  <div className="result-overlay success-overlay">
-                    <span className="overlay-icon" aria-hidden="true">✓</span>
-                    <strong>잘하셨어요</strong>
-                    <span>화면 목표를 선택했어요</span>
-                  </div>
-                )}
-                {currentMission.status === "timed_out" && (
-                  <div className="result-overlay">
-                    <span className="overlay-icon" aria-hidden="true">↻</span>
-                    <strong>이번 미션은 여기까지예요</strong>
-                    <span>천천히 다음 미션을 준비해요</span>
-                  </div>
-                )}
-                {session.phase === "tracking_lost" && (
-                  <div className="tracking-overlay" role="status">
-                    양쪽 어깨가 보이도록 위치를 조정해 주세요
-                  </div>
-                )}
-              </div>
-              <div className="mission-content">
-                <div className="mission-progress">
-                  <span>미션 {session.currentIndex + 1} / {session.missions.length}</span>
-                  <span>{summary?.successCount ?? 0}회 성공</span>
-                </div>
-                <div className="progress-track" aria-label="미션 진행">
-                  <span style={{ width: `${((session.currentIndex + (currentMission.status === "success" || currentMission.status === "timed_out" ? 1 : 0)) / session.missions.length) * 100}%` }} />
-                </div>
-                <h2 className="mission-prompt">
-                  {currentMission.status === "active"
-                    ? `${currentMission.direction === "right" ? "상체를 오른쪽" : "상체를 왼쪽"}으로 천천히 움직여 보세요`
-                    : currentMission.status === "success"
-                      ? "중앙으로 돌아와 주세요"
-                      : "편안한 자세로 잠시 쉬어 주세요"}
-                </h2>
-                <p className="mission-subtitle">
-                  {session.mode === "webcam"
-                    ? "화면 속 어깨 움직임으로 목표를 선택합니다. 실제 체중 이동을 측정하지 않아요."
-                    : "개발용 입력으로 미션 흐름을 확인 중입니다."}
-                </p>
-                {session.mode === "webcam" && (
-                  <div className="camera-mini">
-                    <span className={`status-dot ${sample ? "status-dot-on" : ""}`} />
-                    {session.phase === "tracking_lost"
-                      ? "인식이 잠시 멈췄어요"
-                      : centered
-                        ? "카메라가 움직임을 인식하고 있어요"
-                        : "중앙 자세로 돌아오면 다음 미션을 시작할 수 있어요"}
-                  </div>
-                )}
-                {session.mode === "demo" && currentMission.status === "active" && (
-                  <div className="demo-controls">
-                    <button type="button" className="button button-primary" onClick={() => finishDemoMission(true)}>
-                      개발용 성공 입력
-                    </button>
-                    <button type="button" className="button button-secondary" onClick={() => finishDemoMission(false)}>
-                      개발용 미완료 입력
-                    </button>
-                  </div>
-                )}
-                {(currentMission.status === "success" || currentMission.status === "timed_out") && (
-                  <button
-                    type="button"
-                    className="button button-primary button-wide next-button"
-                    disabled={!centered}
-                    onClick={goToNextMission}
-                  >
-                    {session.currentIndex === session.missions.length - 1
-                      ? "결과 보기"
-                      : "중앙 자세에서 다음 미션"}
-                  </button>
-                )}
-              </div>
-            </div>
-            <p className="medical-disclaimer">
-              이 활동은 산책 경험을 위한 시제품입니다. 의료 진단이나 균형·인지 기능 평가가 아닙니다.
-            </p>
-          </section>
+        {screen === "walking" && session && summary && currentMission && (
+          <WalkingScreen
+            place={selectedPlace}
+            session={session}
+            mission={currentMission}
+            summary={summary}
+            sample={sample}
+            centered={centered}
+            error={cameraError}
+            streetViewVisible={streetViewVisible}
+            onStop={stopActivity}
+            onStreetViewVisibleChange={setStreetViewVisible}
+            onDemoMission={finishDemoMission}
+            onNextMission={goToNextMission}
+          />
         )}
 
         {screen === "result" && session && summary && (
-          <section className="panel result-panel">
-            <div className="result-mark" aria-hidden="true">✓</div>
-            <p className="eyebrow">산책 기록</p>
-            <h1>{session.mode === "demo" ? "대체 시연을 마쳤어요" : "산책을 마쳤어요"}</h1>
-            <p className="lead">{selectedPlace.name}에서 함께한 시간이에요.</p>
-            {session.mode === "demo" && (
-              <div className="demo-banner">개발용 대체 입력으로 기록한 결과입니다. 웹캠 인식 성능을 나타내지 않습니다.</div>
-            )}
-            <div className="summary-grid">
-              <div className="summary-card">
-                <span>활동 시간</span>
-                <strong>{formatDuration(summary.durationMs)}</strong>
-              </div>
-              <div className="summary-card">
-                <span>미션 성공</span>
-                <strong>{summary.successCount}<small> / {summary.startedCount}회</small></strong>
-              </div>
-            </div>
-            {summary.startedCount === 0 && <p className="empty-result">수행한 미션이 없습니다.</p>}
-            <p className="result-disclaimer">
-              이 기록은 게임 활동 결과이며 건강 진단이나 체중 이동·균형 능력 측정이 아닙니다.
-            </p>
-            <button type="button" className="button button-primary button-wide" onClick={leaveResult}>
-              처음으로
-            </button>
-          </section>
+          <ResultScreen place={selectedPlace} session={session} summary={summary} onHome={leaveResult} />
         )}
       </section>
 
