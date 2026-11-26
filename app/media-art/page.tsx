@@ -90,7 +90,7 @@ export default function MediaArtPage() {
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
       if (quizOpen) return;
-      if (theme === "park" && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
         event.preventDefault();
         setDirection(event.key === "ArrowLeft" ? -1 : 1);
       } else if (event.code === "Space" && event.target === document.body && !event.repeat) {
@@ -118,7 +118,7 @@ export default function MediaArtPage() {
       window.removeEventListener("blur", reset);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [quizOpen, theme]);
+  }, [quizOpen]);
 
   const selectTheme = (next: Theme) => {
     setTheme(next);
@@ -159,7 +159,7 @@ export default function MediaArtPage() {
           <h2>시연 기록</h2>
           <p>가상 이동 {Math.floor(distance)} m</p>
           <p>정답 {correct} / 응답 {answered}회</p>
-          <p>{theme === "park" ? "거리와 시점 이동은 버튼으로 조작하는 가상 값입니다." : "사진은 움직이지 않는 정지 화면이며, 이동 거리는 가상 값입니다."}</p>
+          <p>사진을 참고해 만든 가상 풍경이며, 이동 거리도 가상 값입니다.</p>
           <strong>센서 미연결 · 건강 진단 및 낙상 감지 기능 없음</strong>
         </aside>
 
@@ -188,12 +188,12 @@ export default function MediaArtPage() {
               </button>
             </>}
           </dialog>
-          <div className={`art-buttons${theme !== "park" ? " art-buttons-photo" : ""}`}>
-            {theme === "park" && <button type="button" onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setDirection(-1); }} onPointerUp={() => setDirection(0)} onPointerCancel={() => setDirection(0)} onLostPointerCapture={() => setDirection(0)} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") setDirection(-1); }} onKeyUp={() => setDirection(0)} onBlur={() => setDirection(0)}>← 왼쪽 보기</button>}
+          <div className="art-buttons">
+            <button type="button" onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setDirection(-1); }} onPointerUp={() => setDirection(0)} onPointerCancel={() => setDirection(0)} onLostPointerCapture={() => setDirection(0)} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") setDirection(-1); }} onKeyUp={() => setDirection(0)} onBlur={() => setDirection(0)}>← 왼쪽 보기</button>
             <button type="button" className="art-walk" onClick={() => setWalking(!walking)}>{walking ? "일시 정지" : "산책 시작"}</button>
-            {theme === "park" && <button type="button" onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setDirection(1); }} onPointerUp={() => setDirection(0)} onPointerCancel={() => setDirection(0)} onLostPointerCapture={() => setDirection(0)} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") setDirection(1); }} onKeyUp={() => setDirection(0)} onBlur={() => setDirection(0)}>오른쪽 보기 →</button>}
+            <button type="button" onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setDirection(1); }} onPointerUp={() => setDirection(0)} onPointerCancel={() => setDirection(0)} onLostPointerCapture={() => setDirection(0)} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") setDirection(1); }} onKeyUp={() => setDirection(0)} onBlur={() => setDirection(0)}>오른쪽 보기 →</button>
           </div>
-          <p>{theme === "park" ? "방향키로 시점을 이동할 수 있어요. " : "사진은 제자리에 있어요. "}불편하거나 어지러우면 즉시 멈추세요.</p>
+          <p>방향키로 시점을 이동할 수 있어요. 불편하거나 어지러우면 즉시 멈추세요.</p>
         </footer>
       </div>
     </main>
