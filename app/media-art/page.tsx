@@ -7,11 +7,16 @@ import "./style.css";
 
 type Question = { question: string; options: string[]; answer: number; explanation: string };
 const themes: { id: Theme; label: string }[] = [
+  { id: "park", label: "초록 공원길" },
   { id: "retro", label: "8090 추억길" },
   { id: "cherry", label: "진해 벚꽃길" },
   { id: "sea", label: "통영 바다길" },
 ];
 const questions: Record<Theme, Question[]> = {
+  park: [
+    { question: "안녕하세요! 초록 잎이 무성한 이 풍경은 어느 계절을 나타낼까요?", options: ["여름", "눈 덮인 겨울", "낙엽이 진 늦가을"], answer: 0, explanation: "이 공원 풍경은 푸른 잎이 무성한 여름을 표현했어요." },
+    { question: "벤치가 2개 있고 1개를 더 놓으면 모두 몇 개일까요?", options: ["2개", "3개", "4개"], answer: 1, explanation: "2개와 1개를 더하면 3개예요." },
+  ],
   retro: [
     { question: "안녕하세요! 옛날 거리에 어떤 가게가 있었는지 기억하세요?", options: ["전파사", "VR 게임방", "무인 키오스크 카페"], answer: 0, explanation: "전파사는 라디오와 TV 등을 고치던 가게였죠." },
     { question: "시장에 가려고요. 2,000원에 500원을 더하면 얼마일까요?", options: ["2,000원", "2,500원", "3,500원"], answer: 1, explanation: "2,000원 + 500원은 2,500원이에요." },
@@ -27,7 +32,7 @@ const questions: Record<Theme, Question[]> = {
 };
 
 export default function MediaArtPage() {
-  const [theme, setTheme] = useState<Theme>("retro");
+  const [theme, setTheme] = useState<Theme>("park");
   const [walking, setWalking] = useState(false);
   const [direction, setDirection] = useState(0);
   const [distance, setDistance] = useState(0);
@@ -141,7 +146,7 @@ export default function MediaArtPage() {
           <div>
             <a href="/" className="art-back">← 기존 산책으로</a>
             <h1>추억 산책 미디어아트</h1>
-            <p>경남의 풍경을 떠올리는 1인칭 가상 산책</p>
+            <p>풍경을 떠올리며 즐기는 1인칭 가상 산책</p>
           </div>
           <div className="art-theme-list" role="group" aria-label="산책 테마">
             {themes.map((item) => <button key={item.id} type="button" aria-pressed={theme === item.id} onClick={() => selectTheme(item.id)}>{item.label}</button>)}

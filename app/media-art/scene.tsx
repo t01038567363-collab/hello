@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { createRouteStrip, createWalkingRoute, sampleRoute } from "@/lib/walking-route";
+import { createParkScenery } from "./park-scenery";
 
-export type Theme = "retro" | "cherry" | "sea";
+export type Theme = "park" | "retro" | "cherry" | "sea";
 
 const colors = {
+  park: { background: 0x9dcdec, road: 0xd8d1b8, accent: 0xbeb9a3, particles: 0xffffff },
   retro: { background: 0x160d18, road: 0x241e26, accent: 0xf59e0b, particles: 0xffb703 },
   cherry: { background: 0x190b18, road: 0x2b1929, accent: 0xf472b6, particles: 0xfbcfe8 },
   sea: { background: 0x051324, road: 0x0a2540, accent: 0x38bdf8, particles: 0x7dd3fc },
@@ -41,7 +43,7 @@ export default function Scene({ theme, walking, direction, friendVisible }: {
     const palette = colors[theme];
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(palette.background);
-    scene.fog = new THREE.FogExp2(palette.background, 0.023);
+    scene.fog = new THREE.FogExp2(palette.background, theme === "park" ? 0.009 : 0.023);
     const camera = new THREE.PerspectiveCamera(65, 1, 0.1, 200);
     camera.position.set(0, 2.2, 5);
     scene.add(new THREE.AmbientLight(0xffffff, 1.2));
@@ -53,6 +55,7 @@ export default function Scene({ theme, walking, direction, friendVisible }: {
 
     const route = createWalkingRoute();
     const length = route.getLength();
+    if (theme === "park") scene.add(createParkScenery(route));
     const road = new THREE.Mesh(
       createRouteStrip(route, -3.75, 3.75),
       new THREE.MeshStandardMaterial({ color: palette.road, roughness: 0.5 }),
@@ -66,7 +69,7 @@ export default function Scene({ theme, walking, direction, friendVisible }: {
 
     const objects = new THREE.Group();
     scene.add(objects);
-    const objectCount = Math.ceil(length / 9);
+    const objectCount = theme === "park" ? 0 : Math.ceil(length / 9);
     for (let i = 0; i < objectCount; i++) {
       const group = new THREE.Group();
       const { position, tangent } = sampleRoute(route, (i / objectCount) * length);
@@ -93,7 +96,7 @@ export default function Scene({ theme, walking, direction, friendVisible }: {
       }
       objects.add(group);
     }
-    const positions = new Float32Array(400 * 3);
+    const positions = new Float32Array((theme === "park" ? 0 : 400) * 3);
     for (let i = 0; i < positions.length; i += 3) {
       const { position, right } = sampleRoute(route, Math.random() * length);
       const offset = (Math.random() - 0.5) * 18;
