@@ -24,16 +24,18 @@ export function StreetView({ location, heading, successes, onVisibleChange }: Pr
 
   useEffect(() => {
     const receive = (event: MessageEvent) => {
-      if (event.source !== frameRef.current?.contentWindow || event.data?.source !== "walk-street-view") return;
+      if (event.source !== frameRef.current?.contentWindow || event.origin !== "null" || event.data?.source !== "walk-street-view") return;
       if (event.data.type === "ready") {
         setVisible(true);
         onVisibleChange(true);
         setMessage("Google 거리 사진 · 미션 성공 시 한 걸음 이동해요.");
       } else if (event.data.type === "error") {
+        if (typeof event.data.message !== "string") return;
         setVisible(false);
         onVisibleChange(false);
         setMessage(`${event.data.message} 일러스트로 계속할 수 있어요.`);
       } else if (event.data.type === "notice") {
+        if (typeof event.data.message !== "string") return;
         setMessage(event.data.message);
       }
     };
@@ -44,6 +46,7 @@ export function StreetView({ location, heading, successes, onVisibleChange }: Pr
   useEffect(() => {
     if (!visible) return;
     while (lastSuccesses.current < successes) {
+      // An allow-scripts-only sandbox has an opaque origin, so the frame requires "*".
       frameRef.current?.contentWindow?.postMessage({ type: "advance" }, "*");
       lastSuccesses.current++;
     }

@@ -7,7 +7,8 @@ export const STREET_VIEW_DOCUMENT = `<!doctype html>
 <script>
 let panorama, previousPano, pending = 0, moving = false, ready = false, failed = false;
 let loadingTimer, movementTimer;
-const send = (type, message) => parent.postMessage({ source: 'walk-street-view', type, message }, '*');
+const parentOrigin = new URL(document.referrer).origin;
+const send = (type, message) => parent.postMessage({ source: 'walk-street-view', type, message }, parentOrigin);
 const fail = (message) => { failed = true; clearTimeout(loadingTimer); send('error', message); };
 window.gm_authFailure = () => fail('Google 지도 인증에 실패했어요. API 키와 결제 설정을 확인해 주세요.');
 
@@ -81,7 +82,7 @@ function initialize(config) {
 }
 
 window.addEventListener('message', event => {
-  if (event.source !== parent || !event.data) return;
+  if (event.source !== parent || event.origin !== parentOrigin || !event.data) return;
   if (event.data.type === 'initialize') initialize(event.data);
   if (event.data.type === 'advance') { pending++; advance(); }
 });

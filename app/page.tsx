@@ -19,39 +19,10 @@ import {
   type PoseSample,
   type Session,
 } from "@/lib/session";
+import { cameraErrorMessage, type CameraStage } from "@/lib/camera-errors";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PLACES, type Place } from "./places";
 import { StreetView } from "./street-view";
-
-type Place = {
-  id: string;
-  name: string;
-  region: string;
-  description: string;
-  theme: "harbor" | "river";
-  location: { lat: number; lng: number };
-  heading: number;
-};
-
-const PLACES: Place[] = [
-  {
-    id: "sacheon-harbor",
-    name: "삼천포 항구",
-    region: "경남 사천",
-    description: "바닷바람과 항구 풍경을 떠올리는 산책길",
-    theme: "harbor",
-    location: { lat: 34.9235, lng: 128.0695 },
-    heading: 90,
-  },
-  {
-    id: "jinju-river",
-    name: "진주 남강",
-    region: "경남 진주",
-    description: "남강을 따라 천천히 걷는 산책길",
-    theme: "river",
-    location: { lat: 35.1916, lng: 128.0788 },
-    heading: 90,
-  },
-];
 
 type Screen = "places" | "ready" | "calibrating" | "walking" | "result";
 
@@ -200,6 +171,7 @@ export default function Home() {
   const animationRef = useRef<number | null>(null);
   const calibrationSamplesRef = useRef<PoseSample[]>([]);
   const sessionRef = useRef<Session | null>(null);
+  const cameraRequestRef = useRef(0);
 
   const updateSession = useCallback((update: (current: Session) => Session) => {
     const current = sessionRef.current;
@@ -210,6 +182,7 @@ export default function Home() {
   }, []);
 
   const stopCamera = useCallback(() => {
+    cameraRequestRef.current++;
     if (animationRef.current !== null) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
@@ -246,11 +219,29 @@ export default function Home() {
   );
 
   const connectCamera = async () => {
+    stopCamera();
+    const request = cameraRequestRef.current;
+    const isCurrent = () => cameraRequestRef.current === request;
+    let stage: CameraStage = "camera";
     setCameraError("");
     setSample(null);
     calibrationSamplesRef.current = [];
     setCameraStatus("카메라와 자세 인식 모델을 준비하고 있어요.");
     setScreen("calibrating");
+
+    const trackingFailed = (error: unknown) => {
+      if (!isCurrent()) return;
+      console.error("카메라 추적이 중단되었습니다.", error);
+      stopCamera();
+      handlePose(null, performance.now());
+      if (sessionRef.current) {
+        setCameraError(cameraErrorMessage(error, "tracking"));
+      } else {
+        setCameraError(cameraErrorMessage(error, "video"));
+        setCameraStatus("웹캠 모드를 시작하지 못했습니다.");
+        setScreen("ready");
+      }
+    };
 
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -261,12 +252,23 @@ export default function Home() {
         audio: false,
         video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
       });
+      if (!isCurrent()) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
+      stream.getVideoTracks().forEach((track) => {
+        track.addEventListener("ended", () => trackingFailed(new Error("Camera track ended")), { once: true });
+      });
+      stage = "video";
       if (!videoRef.current) throw new Error("카메라 화면을 준비하지 못했습니다.");
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
+      if (!isCurrent()) return;
 
+      stage = "model";
       const vision = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
+      if (!isCurrent()) return;
       const landmarker = await PoseLandmarker.createFromOptions(vision, {
         baseOptions: {
           modelAssetPath: "/models/pose_landmarker_lite.task",
@@ -278,11 +280,16 @@ export default function Home() {
         minPosePresenceConfidence: 0.55,
         minTrackingConfidence: 0.55,
       });
+      if (!isCurrent()) {
+        landmarker.close();
+        return;
+      }
       landmarkerRef.current = landmarker;
       setCameraStatus("양쪽 어깨가 화면에 보이도록 편안하게 서거나 앉아 주세요.");
 
       let lastDetectionAt = 0;
       const detect = (frameTime: number) => {
+        if (!isCurrent()) return;
         const video = videoRef.current;
         if (
           video &&
@@ -291,21 +298,22 @@ export default function Home() {
         ) {
           lastDetectionAt = frameTime;
           const timestamp = performance.now();
-          const result = landmarker.detectForVideo(video, timestamp);
-          handlePose(getShoulderSample(result.landmarks?.[0]), timestamp);
+          try {
+            const result = landmarker.detectForVideo(video, timestamp);
+            handlePose(getShoulderSample(result.landmarks?.[0]), timestamp);
+          } catch (error) {
+            trackingFailed(error);
+            return;
+          }
         }
         animationRef.current = requestAnimationFrame(detect);
       };
       animationRef.current = requestAnimationFrame(detect);
     } catch (error) {
+      if (!isCurrent()) return;
+      console.error("카메라를 시작하지 못했습니다.", error);
       stopCamera();
-      const message =
-        error instanceof Error ? error.message : "카메라를 시작하지 못했습니다.";
-      setCameraError(
-        message.includes("pose_landmarker_lite.task")
-          ? "자세 인식 모델 파일을 찾지 못했어요. 터미널에서 npm run setup:model을 실행한 뒤 다시 시작하거나 대체 시연을 선택해 주세요."
-          : message,
-      );
+      setCameraError(cameraErrorMessage(error, stage));
       setCameraStatus("웹캠 모드를 시작하지 못했습니다.");
       setScreen("ready");
     }
@@ -564,6 +572,7 @@ export default function Home() {
                 <p className="eyebrow">{session.mode === "demo" ? "대체 시연 모드" : "화면 움직임 미션"}</p>
                 <h1>{selectedPlace.name}</h1>
               </div>
+              {cameraError && <p className="error-message" role="alert">{cameraError}</p>}
               <button type="button" className="button button-stop" onClick={stopActivity}>
                 <span aria-hidden="true">■</span> 중단하기
               </button>

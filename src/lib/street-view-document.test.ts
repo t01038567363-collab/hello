@@ -4,9 +4,9 @@ import vm from "node:vm";
 import { STREET_VIEW_DOCUMENT } from "./street-view-document";
 
 function createFrame(available: boolean) {
-  const messages: { type: string; message?: string }[] = [];
-  const parent = { postMessage: (message: { type: string; message?: string }) => messages.push(message) };
-  let handler: (event: { source: object; data: object }) => void = () => {};
+  const messages: { type: string; message?: string; target: string }[] = [];
+  const parent = { postMessage: (message: { type: string; message?: string }, target: string) => messages.push({ ...message, target }) };
+  let handler: (event: { source: object; origin: string; data: object }) => void = () => {};
   let linksChanged: () => void = () => {};
   const moved: string[] = [];
   const panorama = {
@@ -23,10 +23,11 @@ function createFrame(available: boolean) {
     addEventListener: (_name: string, callback: typeof handler) => { handler = callback; },
   };
   const context = vm.createContext({
-    window, parent, URLSearchParams,
+    window, parent, URL, URLSearchParams,
     setTimeout: () => 1,
     clearTimeout: () => {},
     document: {
+      referrer: "https://walk.example/media",
       createElement: () => ({}),
       head: { appendChild: () => {} },
       getElementById: () => ({}),
@@ -45,20 +46,32 @@ function createFrame(available: boolean) {
   const script = STREET_VIEW_DOCUMENT.match(/<script>([\s\S]*)<\/script>/)?.[1];
   assert.ok(script);
   vm.runInContext(script, context);
-  handler({ source: parent, data: { type: "initialize", key: "test", location: {}, heading: 90 } });
+  handler({ source: parent, origin: "https://walk.example", data: { type: "initialize", key: "test", location: {}, heading: 90 } });
   (window as { initWalkStreetView?: () => void }).initWalkStreetView?.();
-  return { messages, moved, linksChanged: () => linksChanged(), advance: () => handler({ source: parent, data: { type: "advance" } }) };
+  return {
+    messages, moved, linksChanged: () => linksChanged(),
+    advance: (origin = "https://walk.example", source: object = parent) => handler({ source, origin, data: { type: "advance" } }),
+  };
 }
 
 test("success advances to a forward panorama once and avoids immediate backtracking", () => {
   const frame = createFrame(true);
   frame.linksChanged();
   assert.equal(frame.messages[0].type, "ready");
+  assert.equal(frame.messages[0].target, "https://walk.example");
   frame.advance();
   assert.deepEqual(frame.moved, ["forward"]);
   frame.linksChanged();
   frame.advance();
   assert.deepEqual(frame.moved, ["forward", "onward"]);
+});
+
+test("frame ignores commands from an unexpected origin or window", () => {
+  const frame = createFrame(true);
+  frame.linksChanged();
+  frame.advance("https://other.example");
+  frame.advance("https://walk.example", {});
+  assert.deepEqual(frame.moved, []);
 });
 
 test("missing Street View coverage reports an error instead of success", () => {
