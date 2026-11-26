@@ -60,7 +60,7 @@
 .art-header p, .art-summary p { color: #d6e0ef; }
 .art-back { color: #b7e5ff; font-weight: 700; }
 
-.art-theme-list, .art-speed {
+.art-theme-list {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -109,10 +109,10 @@
 .art-next { margin-top: 12px; }
 
 .art-summary { grid-column: 2; align-self: start; padding: 20px; font-size: 15px; line-height: 1.6; }
+.art-encounter { grid-column: 1; grid-row: 2; justify-self: center; align-self: start; margin: 0; padding: 14px 20px; font-size: 20px; font-weight: 700; }
 .art-summary h2 { margin: 0 0 12px; color: #c0caff; font-size: 18px; }
 .art-summary strong { display: block; margin-top: 12px; color: #ffe3a3; }
 .art-controls { grid-column: 1 / -1; width: min(100%, 900px); justify-self: center; padding: 16px; }
-.art-speed { justify-content: center; margin-bottom: 12px; }
 .art-buttons { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 10px; }
 .art-buttons button { min-height: 56px; touch-action: none; }
 .art-app .art-walk { background: #076f53; border-color: #84e6bb; }

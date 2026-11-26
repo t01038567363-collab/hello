@@ -11,19 +11,19 @@ const colors = {
   sea: { background: 0x051324, road: 0x0a2540, accent: 0x38bdf8, particles: 0x7dd3fc },
 };
 
-export default function Scene({ theme, walking, speed, direction }: {
+export default function Scene({ theme, walking, direction, friendVisible }: {
   theme: Theme;
   walking: boolean;
-  speed: number;
   direction: number;
+  friendVisible: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const controls = useRef({ walking, speed, direction });
+  const controls = useRef({ walking, direction, friendVisible });
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    controls.current = { walking, speed, direction };
-  }, [walking, speed, direction]);
+    controls.current = { walking, direction, friendVisible };
+  }, [walking, direction, friendVisible]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -104,6 +104,28 @@ export default function Scene({ theme, walking, speed, direction }: {
     );
     scene.add(particles);
 
+    const friend = new THREE.Group();
+    const skin = new THREE.MeshStandardMaterial({ color: 0xf3c8a9 });
+    const clothes = new THREE.MeshStandardMaterial({ color: 0x6bb5c3 });
+    const trousers = new THREE.MeshStandardMaterial({ color: 0x3f5069 });
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 12), skin);
+    head.position.y = 1.65;
+    friend.add(head);
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.33, 0.55, 4, 10), clothes);
+    body.position.y = 0.95;
+    friend.add(body);
+    for (const x of [-0.2, 0.2]) {
+      const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.5, 4, 8), trousers);
+      leg.position.set(x, 0.37, 0);
+      friend.add(leg);
+      const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.5, 4, 8), clothes);
+      arm.position.set(x * 2.2, 1.05, 0);
+      friend.add(arm);
+    }
+    friend.position.set(1.2, 0, -18);
+    friend.visible = false;
+    scene.add(friend);
+
     const resize = () => {
       const width = container.clientWidth;
       const height = container.clientHeight;
@@ -123,7 +145,7 @@ export default function Scene({ theme, walking, speed, direction }: {
       previous = time;
       const current = controls.current;
       if (current.walking) {
-        const movement = current.speed * delta;
+        const movement = 2 * delta;
         objects.children.forEach((item) => {
           item.position.z += movement;
           if (item.position.z > 8) item.position.z -= 24 * 6.5;
@@ -131,6 +153,13 @@ export default function Scene({ theme, walking, speed, direction }: {
         for (let i = 2; i < positions.length; i += 3) {
           positions[i] += movement * 0.8;
           if (positions[i] > 8) positions[i] = -120;
+        }
+        if (!current.friendVisible) {
+          friend.visible = false;
+          friend.position.z = -18;
+        } else {
+          friend.visible = true;
+          if (current.walking) friend.position.z = Math.min(0, friend.position.z + 8 * delta);
         }
         particlesGeometry.attributes.position.needsUpdate = true;
       }

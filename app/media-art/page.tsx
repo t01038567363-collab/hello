@@ -13,27 +13,27 @@ const themes: { id: Theme; label: string }[] = [
 ];
 const questions: Record<Theme, Question[]> = {
   retro: [
-    { question: "옛 거리에서 볼 수 있었던 가게는 무엇일까요?", options: ["전파사", "VR 게임방", "무인 키오스크 카페"], answer: 0, explanation: "전파사는 라디오와 TV 등을 고치던 가게입니다." },
-    { question: "2,000원과 500원을 더하면 얼마일까요?", options: ["2,000원", "2,500원", "3,500원"], answer: 1, explanation: "2,000원 + 500원 = 2,500원입니다." },
+    { question: "안녕하세요! 옛날 거리에 어떤 가게가 있었는지 기억하세요?", options: ["전파사", "VR 게임방", "무인 키오스크 카페"], answer: 0, explanation: "전파사는 라디오와 TV 등을 고치던 가게였죠." },
+    { question: "시장에 가려고요. 2,000원에 500원을 더하면 얼마일까요?", options: ["2,000원", "2,500원", "3,500원"], answer: 1, explanation: "2,000원 + 500원은 2,500원이에요." },
   ],
   cherry: [
-    { question: "봄에 진해에서 볼 수 있는 꽃은 무엇일까요?", options: ["해바라기", "벚꽃", "코스모스"], answer: 1, explanation: "진해는 봄의 벚꽃으로 유명합니다." },
-    { question: "꽃잎 7장에 5장을 더하면 몇 장일까요?", options: ["11장", "12장", "13장"], answer: 1, explanation: "7 + 5 = 12장입니다." },
+    { question: "안녕하세요! 봄에 진해에서 만나는 이 꽃은 뭘까요?", options: ["해바라기", "벚꽃", "코스모스"], answer: 1, explanation: "진해는 봄의 벚꽃으로 유명하죠." },
+    { question: "꽃잎 7장에 5장이 더 날아왔어요. 모두 몇 장일까요?", options: ["11장", "12장", "13장"], answer: 1, explanation: "7 + 5는 12장이에요." },
   ],
   sea: [
-    { question: "통영의 벽화 마을 이름은 무엇일까요?", options: ["동피랑", "전주 한옥마을", "안동 하회마을"], answer: 0, explanation: "동피랑은 통영의 벽화 마을입니다." },
-    { question: "6,000원짜리 두 개를 사면 얼마일까요?", options: ["10,000원", "12,000원", "14,000원"], answer: 1, explanation: "6,000원 × 2 = 12,000원입니다." },
+    { question: "안녕하세요! 통영에 있는 벽화 마을 이름을 아세요?", options: ["동피랑", "전주 한옥마을", "안동 하회마을"], answer: 0, explanation: "동피랑은 통영의 아름다운 벽화 마을이에요." },
+    { question: "6,000원짜리 김밥 두 개를 사면 얼마가 될까요?", options: ["10,000원", "12,000원", "14,000원"], answer: 1, explanation: "6,000원 × 2는 12,000원이에요." },
   ],
 };
 
 export default function MediaArtPage() {
   const [theme, setTheme] = useState<Theme>("retro");
   const [walking, setWalking] = useState(false);
-  const [speed, setSpeed] = useState(2);
   const [direction, setDirection] = useState(0);
   const [distance, setDistance] = useState(0);
   const [questionIndex, setQuestionIndex] = useState<number | null>(null);
   const [quizOpen, setQuizOpen] = useState(false);
+  const [friendVisible, setFriendVisible] = useState(false);
   const [answer, setAnswer] = useState<number | null>(null);
   const [answered, setAnswered] = useState(0);
   const [correct, setCorrect] = useState(0);
@@ -48,22 +48,28 @@ export default function MediaArtPage() {
       const now = performance.now();
       const elapsed = Math.min((now - last) / 1000, 0.5);
       last = now;
-      setDistance((current) => current + elapsed * speed);
+      setDistance((current) => current + elapsed * 2);
     }, 250);
     return () => window.clearInterval(timer);
-  }, [walking, speed]);
+  }, [walking]);
 
   useEffect(() => {
-    if (!walking || quizOpen) return;
+    if (!walking || quizOpen || friendVisible) return;
+    const timer = window.setTimeout(() => setFriendVisible(true), 12_000 + Math.random() * 13_000);
+    return () => window.clearTimeout(timer);
+  }, [walking, quizOpen, friendVisible, theme]);
+
+  useEffect(() => {
+    if (!walking || !friendVisible || quizOpen) return;
     const timer = window.setTimeout(() => {
       setQuestionIndex((previous) => chooseQuestionIndex(questions[theme].length, previous));
       setAnswer(null);
       setDirection(0);
       setWalking(false);
       setQuizOpen(true);
-    }, 12_000 + Math.random() * 13_000);
+    }, 2_500);
     return () => window.clearTimeout(timer);
-  }, [walking, quizOpen, theme]);
+  }, [walking, quizOpen, friendVisible, theme]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -122,12 +128,13 @@ export default function MediaArtPage() {
   };
   const continueWalk = () => {
     setQuizOpen(false);
+    setFriendVisible(false);
     setWalking(true);
   };
 
   return (
     <main className="art-app">
-      <Scene theme={theme} walking={walking} speed={speed} direction={direction} />
+      <Scene theme={theme} walking={walking} direction={direction} friendVisible={friendVisible} />
       {walking && <button type="button" className="art-stop" onClick={() => setWalking(false)}>화면 정지</button>}
       <div className="art-content">
         <header className="art-header art-box">
@@ -149,22 +156,18 @@ export default function MediaArtPage() {
           <strong>센서 미연결 · 건강 진단 및 낙상 감지 기능 없음</strong>
         </aside>
 
+        {friendVisible && !quizOpen && <p className="art-encounter art-box" role="status">산책길에서 친구가 다가와요!</p>}
+
         <footer className="art-controls art-box">
-          <div className="art-speed">
-            <span>화면 이동 속도</span>
-            {[{ value: 1, label: "느림" }, { value: 2, label: "보통" }, { value: 3, label: "빠름" }].map((item) => (
-              <button type="button" key={item.value} aria-pressed={speed === item.value} onClick={() => setSpeed(item.value)}>{item.label}</button>
-            ))}
-          </div>
           <dialog
             ref={dialogRef}
             className="art-question art-box"
             aria-labelledby="art-question-title"
-            onCancel={(event) => { event.preventDefault(); setQuizOpen(false); }}
+            onCancel={(event) => { event.preventDefault(); setQuizOpen(false); setFriendVisible(false); }}
             onClose={() => setQuizOpen(false)}
           >
             {question && <>
-              <div className="art-meta">깜짝 퀴즈</div>
+              <div className="art-meta"><span aria-hidden="true">👋</span> 산책길 친구가 말을 걸었어요</div>
               <h2 id="art-question-title">{question.question}</h2>
               <p>산책 화면이 잠시 멈췄어요. 편안하게 답해 주세요.</p>
               <div className="art-options">
@@ -172,7 +175,7 @@ export default function MediaArtPage() {
                   <button type="button" key={option} disabled={answer !== null} onClick={() => chooseAnswer(index)}>{option}</button>
                 ))}
               </div>
-              {answer !== null && <p className="art-feedback" role="status">{answer === question.answer ? "정답이에요!" : "괜찮아요!"} {question.explanation}</p>}
+              {answer !== null && <p className="art-feedback" role="status">친구: {answer === question.answer ? "함께 이야기해서 즐거워요!" : "괜찮아요, 함께 알아봐요!"} {question.explanation}</p>}
               <button ref={continueRef} type="button" className="art-next" onClick={continueWalk}>
                 {answer === null ? "건너뛰고 산책 계속하기" : "산책 계속하기"}
               </button>
