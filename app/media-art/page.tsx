@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { chooseQuestionIndex } from "@/lib/surprise-quiz";
 import Scene, { type Theme } from "./scene";
 import "./style.css";
 
@@ -31,12 +32,14 @@ export default function MediaArtPage() {
   const [speed, setSpeed] = useState(2);
   const [direction, setDirection] = useState(0);
   const [distance, setDistance] = useState(0);
-  const [questionIndex, setQuestionIndex] = useState(0);
+  const [questionIndex, setQuestionIndex] = useState<number | null>(null);
+  const [quizOpen, setQuizOpen] = useState(false);
   const [answer, setAnswer] = useState<number | null>(null);
   const [answered, setAnswered] = useState(0);
   const [correct, setCorrect] = useState(0);
-  const nextAt = useRef(12);
-  const question = questions[theme][questionIndex];
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const continueRef = useRef<HTMLButtonElement>(null);
+  const question = questionIndex === null ? null : questions[theme][questionIndex];
 
   useEffect(() => {
     if (!walking) return;
@@ -51,14 +54,31 @@ export default function MediaArtPage() {
   }, [walking, speed]);
 
   useEffect(() => {
-    if (distance < nextAt.current || answer === null) return;
-    nextAt.current = distance + 18;
-    setQuestionIndex((index) => (index + 1) % questions[theme].length);
-    setAnswer(null);
-  }, [distance, answer, theme]);
+    if (!walking || quizOpen) return;
+    const timer = window.setTimeout(() => {
+      setQuestionIndex((previous) => chooseQuestionIndex(questions[theme].length, previous));
+      setAnswer(null);
+      setDirection(0);
+      setWalking(false);
+      setQuizOpen(true);
+    }, 12_000 + Math.random() * 13_000);
+    return () => window.clearTimeout(timer);
+  }, [walking, quizOpen, theme]);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (quizOpen && !dialog.open) dialog.showModal();
+    else if (!quizOpen && dialog.open) dialog.close();
+  }, [quizOpen]);
+
+  useEffect(() => {
+    if (quizOpen && answer !== null) continueRef.current?.focus();
+  }, [quizOpen, answer]);
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
+      if (quizOpen) return;
       if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
         event.preventDefault();
         setDirection(event.key === "ArrowLeft" ? -1 : 1);
@@ -87,24 +107,22 @@ export default function MediaArtPage() {
       window.removeEventListener("blur", reset);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, []);
+  }, [quizOpen]);
 
   const selectTheme = (next: Theme) => {
     setTheme(next);
-    setQuestionIndex(0);
+    setQuestionIndex(null);
     setAnswer(null);
-    nextAt.current = distance + 12;
   };
   const chooseAnswer = (index: number) => {
-    if (answer !== null) return;
+    if (answer !== null || !question) return;
     setAnswer(index);
     setAnswered((value) => value + 1);
     if (index === question.answer) setCorrect((value) => value + 1);
   };
-  const nextQuestion = () => {
-    setQuestionIndex((index) => (index + 1) % questions[theme].length);
-    setAnswer(null);
-    nextAt.current = distance + 18;
+  const continueWalk = () => {
+    setQuizOpen(false);
+    setWalking(true);
   };
 
   return (
@@ -123,21 +141,9 @@ export default function MediaArtPage() {
           </div>
         </header>
 
-        <section className="art-question art-box" aria-labelledby="art-question-title">
-          <div className="art-meta"><span>함께 풀어보는 퀴즈</span><span>가상 이동 {Math.floor(distance)} m</span></div>
-          <h2 id="art-question-title">{question.question}</h2>
-          <p>편안하게 앉거나 서서 버튼을 선택하세요.</p>
-          <div className="art-options">
-            {question.options.map((option, index) => (
-              <button type="button" key={option} disabled={answer !== null} onClick={() => chooseAnswer(index)}>{option}</button>
-            ))}
-          </div>
-          {answer !== null && <p className="art-feedback" role="status">{answer === question.answer ? "정답이에요!" : "괜찮아요!"} {question.explanation}</p>}
-          <button type="button" className="art-next" onClick={nextQuestion}>다음 문제</button>
-        </section>
-
         <aside className="art-summary art-box">
           <h2>시연 기록</h2>
+          <p>가상 이동 {Math.floor(distance)} m</p>
           <p>정답 {correct} / 응답 {answered}회</p>
           <p>거리와 시점 이동은 버튼으로 조작하는 가상 값입니다.</p>
           <strong>센서 미연결 · 건강 진단 및 낙상 감지 기능 없음</strong>
@@ -150,6 +156,28 @@ export default function MediaArtPage() {
               <button type="button" key={item.value} aria-pressed={speed === item.value} onClick={() => setSpeed(item.value)}>{item.label}</button>
             ))}
           </div>
+          <dialog
+            ref={dialogRef}
+            className="art-question art-box"
+            aria-labelledby="art-question-title"
+            onCancel={(event) => { event.preventDefault(); setQuizOpen(false); }}
+            onClose={() => setQuizOpen(false)}
+          >
+            {question && <>
+              <div className="art-meta">깜짝 퀴즈</div>
+              <h2 id="art-question-title">{question.question}</h2>
+              <p>산책 화면이 잠시 멈췄어요. 편안하게 답해 주세요.</p>
+              <div className="art-options">
+                {question.options.map((option, index) => (
+                  <button type="button" key={option} disabled={answer !== null} onClick={() => chooseAnswer(index)}>{option}</button>
+                ))}
+              </div>
+              {answer !== null && <p className="art-feedback" role="status">{answer === question.answer ? "정답이에요!" : "괜찮아요!"} {question.explanation}</p>}
+              <button ref={continueRef} type="button" className="art-next" onClick={continueWalk}>
+                {answer === null ? "건너뛰고 산책 계속하기" : "산책 계속하기"}
+              </button>
+            </>}
+          </dialog>
           <div className="art-buttons">
             <button type="button" onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setDirection(-1); }} onPointerUp={() => setDirection(0)} onPointerCancel={() => setDirection(0)} onLostPointerCapture={() => setDirection(0)} onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") setDirection(-1); }} onKeyUp={() => setDirection(0)} onBlur={() => setDirection(0)}>← 왼쪽 보기</button>
             <button type="button" className="art-walk" onClick={() => setWalking(!walking)}>{walking ? "일시 정지" : "산책 시작"}</button>
